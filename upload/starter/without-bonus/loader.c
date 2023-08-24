@@ -2,6 +2,7 @@
 
 Elf32_Ehdr *ehdr;
 Elf32_Phdr *phdr;
+Elf32_Shdr *shdr_table;
 int fd;//file descriptor 
 
 /*
@@ -31,21 +32,24 @@ void load_and_run_elf(char** argv) {
 // Step 1: Load entire binary content into memory
 off_t size = lseek(fd, 0, SEEK_END);
 if (size == -1) {
-    perror("Error seeking to end of file");
+    perror("Error during lseek execution");
     loader_cleanup();
     return;
 }
-lseek(fd, 0, SEEK_SET);  // Move the file pointer back to the beginning
+// Move the file pointer back to the beginning
+lseek(fd, 0, SEEK_SET); 
+
+
 Elf32_Ehdr *file_data = malloc(size);
 read(fd,ehdr,sizeof(Elf32_Ehdr));
 if (!file_data) {
-    perror("Error allocating memory for binary content");
+    perror("Error allocating memory for file content");
     loader_cleanup();
     return;
 }
 ssize_t bytes_read = read(fd, file_data, size);
 if (bytes_read != size) {
-    perror("Error reading binary content");
+    perror("Error reading  the file content");
     loader_cleanup();
     return;
 }
@@ -60,6 +64,7 @@ if (bytes_read != size) {
     for (int i = 0; i < pnum; i++){
        
         if (phdr->p_type==PT_LOAD){
+            // Step 4: Find entry point within the loaded segment
             if(ehdr->e_entry>=phdr->p_vaddr&&ehdr->e_entry < phdr->p_vaddr + phdr->p_memsz){
             
             break;}
@@ -68,7 +73,7 @@ if (bytes_read != size) {
 
     read(fd, phdr, ehdr -> e_phentsize);
 }
-
+  
     // Step 3: Allocate memory and copy segment content
     void *loaded_segment = mmap((void*)(phdr->p_vaddr), phdr->p_memsz, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_FIXED, fd, phdr->p_offset);
     
@@ -77,8 +82,9 @@ if (bytes_read != size) {
         loader_cleanup();
         return;
     }
-    // Step 4: Find entry point within the loaded segment
+    
     int (*start_func)() = (int (*)())(ehdr->e_entry);
+   
     start_func();
     
     // Step 5 and 6: Call _start function
@@ -90,8 +96,31 @@ int main(int argc, char** argv) {
         printf( "Usage: %s <path_to_executable>\n", argv[0]);
         return 1;
     }
+
+    
  // Cleanup
     loader_cleanup();
     load_and_run_elf(argv);
+int flag=0;
+    if(ehdr->e_ident[EI_MAG0]==ELFMAG0){
+        if(ehdr->e_ident[EI_MAG1]==ELFMAG1){
+            if(ehdr->e_ident[EI_MAG2]==ELFMAG2){
+                if(ehdr->e_ident[EI_MAG3]==ELFMAG3){
+            flag=1;
+        }
+            
+        }
+        }
+
+    }
+    if(flag==1){
+        printf("valid elf");
+    }
+    else{
+        printf("invalid elf");
+    }
+    
     return 0;
+   
+    
 }
